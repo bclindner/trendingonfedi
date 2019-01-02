@@ -92,7 +92,7 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 				// unescape HTML entities
 				word := html.UnescapeString(stripped)
 				// trim the word
-				word = strings.Trim(word, " ")
+				word = strings.Trim(word, trimchars)
 				// convert it to lowercase
 				word = strings.ToLower(words[i])
 				// determine if the word has been found before
