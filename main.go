@@ -35,6 +35,7 @@ const (
 var (
 	// Configuration file.
 	config Config
+	client *mastodon.Client
 	// Interval in which the aggregation function is run.
 	postInterval time.Duration
 	// Timer for the aggregation function.
@@ -95,16 +96,16 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 				word = strings.Trim(word, trimchars)
 				// convert it to lowercase
 				word = strings.ToLower(words[i])
-				// determine if the word has been found before
-				found := false
+				// determine if the word is in the ignore list
+				isIgnoredWord := false
 				for _, ignoredWord := range ignoredWords {
 					if ignoredWord == word {
 						ignorecount++
-						found = true
+						isIgnoredWord = true
 						continue WordLoop
 					}
 				}
-				if !found && len(word) > 0 {
+				if !isIgnoredWord && len(word) > 0 {
 					wordlist[word]++
 				}
 			}
@@ -164,7 +165,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Couldn't parse duration:", err)
 	}
-	client := mastodon.NewClient(&mastodon.Config{
+	client = mastodon.NewClient(&mastodon.Config{
 		Server:       config.Server,
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
