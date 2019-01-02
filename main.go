@@ -21,7 +21,7 @@ type Config struct {
 	ClientSecret string `json:"clientSecret"`
 	AccessToken  string `json:"accessToken"`
 	LocalOnly    bool   `json:"localOnly"`
-	LogToots     bool   `json:"logToots"`
+	LogPosts     bool   `json:"logposts"`
 	PostInterval string `json:"postInterval"`
 }
 
@@ -43,8 +43,8 @@ var (
 	policy = bluemonday.StrictPolicy()
 	// List of words currently being tracked..
 	wordlist = make(WordList)
-	// Number of toots sent this interval.
-	tootCount int
+	// Number of posts sent this interval.
+	postCount int
 	// List of words that the WordList shouldn't ever track.
 	ignoredWords []string
 )
@@ -76,11 +76,11 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 	for untypedEvent := range eventstream {
 		switch evt := untypedEvent.(type) {
 		case *mastodon.UpdateEvent:
-			// ignore bot toots
+			// ignore bot posts
 			if evt.Status.Account.Bot {
 				continue
 			}
-			tootCount++
+			postCount++
 			ignorecount := 0
 			// strip HTML tags
 			stripped := policy.Sanitize(evt.Status.Content)
@@ -108,8 +108,8 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 					wordlist[word]++
 				}
 			}
-			if config.LogToots {
-				log.Printf("Collected %d words (%d ignored words omitted) from toot by %s", len(words), ignorecount, evt.Status.Account.Acct)
+			if config.LogPosts {
+				log.Printf("Collected %d words (%d ignored words omitted) from post by %s", len(words), ignorecount, evt.Status.Account.Acct)
 			}
 		case *mastodon.ErrorEvent:
 			// handle error
@@ -121,10 +121,10 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 	}
 }
 
-func aggregateToots() {
-	log.Printf("Aggregation triggered. Total toots received: %d.\n", tootCount)
+func aggregateposts() {
+	log.Printf("Aggregation triggered. Total posts received: %d.\n", postCount)
 	// reset the count now
-	tootCount = 0
+	postCount = 0
 	list := sortedList(wordlist)
 	i := 5
 	log.Println("Top 5 words:")
@@ -133,7 +133,7 @@ func aggregateToots() {
 		if i < 0 {
 			break
 		}
-		log.Printf("%s, tooted %d times", word.Text, word.Count)
+		log.Printf("%s, posted %d times", word.Text, word.Count)
 	}
 	timer.Reset(postInterval)
 }
@@ -176,6 +176,6 @@ func main() {
 		log.Fatal("Couldn't open timeline websocket:", err)
 	}
 	log.Printf("Done. Entering event loop.")
-	timer = time.AfterFunc(postInterval, aggregateToots)
+	timer = time.AfterFunc(postInterval, aggregateposts)
 	handleWSEvents(eventstream)
 }
