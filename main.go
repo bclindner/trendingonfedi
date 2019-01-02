@@ -89,13 +89,13 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 			words := strings.Split(stripped, " ")
 			// process and add each word to the wordlist, if it is not a stop word
 		WordLoop:
-			for i := range words {
+			for _, word := range words {
 				// unescape HTML entities
-				word := html.UnescapeString(stripped)
+				word = html.UnescapeString(word)
+				// convert it to lowercase
+				word = strings.ToLower(word)
 				// trim the word
 				word = strings.Trim(word, trimchars)
-				// convert it to lowercase
-				word = strings.ToLower(words[i])
 				// determine if the word is in the ignore list
 				isIgnoredWord := false
 				for _, ignoredWord := range ignoredWords {
@@ -105,6 +105,7 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 						continue WordLoop
 					}
 				}
+				// don't recognize empty words, either
 				if !isIgnoredWord && len(word) > 0 {
 					wordlist[word]++
 				}
