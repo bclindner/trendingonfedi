@@ -84,15 +84,18 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 			ignorecount := 0
 			// strip HTML tags
 			stripped := policy.Sanitize(evt.Status.Content)
-			// unescape HTML entities
-			unescaped := html.UnescapeString(stripped)
 			// break into words
-			words := strings.Split(unescaped, " ")
+			words := strings.Split(stripped, " ")
 			// process and add each word to the wordlist, if it is not a stop word
 		WordLoop:
 			for i := range words {
-				word := strings.ToLower(words[i])
+				// unescape HTML entities
+				word := html.UnescapeString(stripped)
+				// trim the word
 				word = strings.Trim(word, " ")
+				// convert it to lowercase
+				word = strings.ToLower(words[i])
+				// determine if the word has been found before
 				found := false
 				for _, ignoredWord := range ignoredWords {
 					if ignoredWord == word {
