@@ -106,7 +106,7 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 				}
 			}
 			if config.LogToots {
-				log.Printf("Collected %d words (%d ignored words omitted) from toot by %s", len(words), ignorecount, evt.Status.Account.Username)
+				log.Printf("Collected %d words (%d ignored words omitted) from toot by %s", len(words), ignorecount, evt.Status.Account.Acct)
 			}
 		case *mastodon.ErrorEvent:
 			// handle error
