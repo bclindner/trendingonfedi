@@ -21,6 +21,7 @@ type Config struct {
 	ClientSecret string `json:"clientSecret"`
 	AccessToken  string `json:"accessToken"`
 	LocalOnly    bool   `json:"localOnly"`
+	LogToots     bool   `json:"logToots"`
 	PostInterval string `json:"postInterval"`
 }
 
@@ -28,7 +29,7 @@ type Config struct {
 type WordList map[string]int
 
 const (
-	trimchars = "!.,;?"
+	trimchars = "!.,;?'`'\""
 )
 
 var (
@@ -44,8 +45,8 @@ var (
 	wordlist = make(WordList)
 	// Number of toots sent this interval.
 	tootCount int
-	// List of stop words that the WordList shouldn't ever carry.
-	stopWords []string
+	// List of words that the WordList shouldn't ever track.
+	ignoredWords []string
 )
 
 // Word is the structure used to represent a word and its occurrences, to sort the WordList.
@@ -75,8 +76,12 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 	for untypedEvent := range eventstream {
 		switch evt := untypedEvent.(type) {
 		case *mastodon.UpdateEvent:
+			// ignore bot toots
+			if evt.Status.Account.Bot {
+				continue
+			}
 			tootCount++
-			stopwordcount := 0
+			ignorecount := 0
 			// strip HTML tags
 			stripped := policy.Sanitize(evt.Status.Content)
 			// unescape HTML entities
@@ -86,21 +91,23 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 			// process and add each word to the wordlist, if it is not a stop word
 		WordLoop:
 			for i := range words {
-				word := strings.Trim(words[i], " ")
-				word = strings.ToLower(word)
+				word := strings.ToLower(words[i])
+				word = strings.Trim(word, " ")
 				found := false
-				for _, stopWord := range stopWords {
-					if stopWord == word {
-						stopwordcount++
+				for _, ignoredWord := range ignoredWords {
+					if ignoredWord == word {
+						ignorecount++
 						found = true
 						continue WordLoop
 					}
 				}
-				if !found {
+				if !found && len(word) > 0 {
 					wordlist[word]++
 				}
 			}
-			log.Printf("Collected %d words (%d stop words omitted) from toot by %s", len(words), stopwordcount, evt.Status.Account.Username)
+			if config.LogToots {
+				log.Printf("Collected %d words (%d ignored words omitted) from toot by %s", len(words), ignorecount, evt.Status.Account.Username)
+			}
 		case *mastodon.ErrorEvent:
 			// handle error
 			log.Println("Error in timeline websocket:", evt)
@@ -129,17 +136,17 @@ func aggregateToots() {
 }
 
 func main() {
-	log.Println("Reading list of stop words...")
+	log.Println("Reading list of ignored words...")
 	// this is inefficient but if that becomes a problem i'll fix it later
-	stopfile, err := os.Open("stopwords.txt")
+	stopfile, err := os.Open("ignore.txt")
 	if err != nil {
-		log.Fatal("Couldn't read stop words list:", err)
+		log.Fatal("Couldn't read ignored words list:", err)
 	}
 	scanner := bufio.NewScanner(stopfile)
 	for scanner.Scan() {
-		stopWords = append(stopWords, scanner.Text())
+		ignoredWords = append(ignoredWords, scanner.Text())
 	}
-	log.Printf("%d stop words loaded.\n", len(stopWords))
+	log.Printf("%d ignored words loaded.\n", len(ignoredWords))
 	log.Println("Starting the bot...")
 	configfile, err := os.Open("config.json")
 	if err != nil {
