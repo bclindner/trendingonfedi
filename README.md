@@ -10,16 +10,21 @@ Simply download (or compile) a release, edit the ignore.txt file as necessary, a
 
 ```json
 {
-  "server": "https://yourmastodon.server",
-  "clientID": "<your mastodon client ID here>",
-  "clientSecret": "<your mastodon client secret here>",
-  "accessToken": "<your mastodon access token here>",
-  "wordsToPost": true,
+  "credentials": {
+    "server": "https://yourmastodon.server",
+    "clientID": "<your mastodon client ID here>",
+    "clientSecret": "<your mastodon client secret here>",
+    "accessToken": "<your mastodon access token here>",
+  }
+  "wordsToPost": 10,
   "localOnly": false,
   "logPosts": true,
-  "postInterval": "1h"
+  "postInterval": "1h",
+  "visibility": "unlisted"
 }
 ```
+
+The `visibility`, `logPosts`, and `localOnly` parameters are optional.
 
 Launch the bot, and it should chug along reading posts from the Mastodon timeline, occasionally aggregating the posts it reads and writing a post.
 
