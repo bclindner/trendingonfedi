@@ -15,7 +15,7 @@ Simply download (or compile) a release, edit the ignore.txt file as necessary, a
     "clientID": "<your mastodon client ID here>",
     "clientSecret": "<your mastodon client secret here>",
     "accessToken": "<your mastodon access token here>",
-  }
+  },
   "wordsToPost": 10,
   "localOnly": false,
   "logPosts": true,
