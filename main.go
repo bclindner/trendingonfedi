@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/mattn/go-mastodon"
 	"github.com/microcosm-cc/bluemonday"
 	"html"
@@ -23,6 +24,7 @@ type Config struct {
 	LocalOnly    bool   `json:"localOnly"`
 	LogPosts     bool   `json:"logposts"`
 	PostInterval string `json:"postInterval"`
+	WordsToPost  int    `json:"wordsToPost"`
 }
 
 // WordList is a simple map type that stores each word and its number of occurrences.
@@ -129,6 +131,7 @@ func aggregateposts() {
 	postCount = 0
 	list := sortedList(wordlist)
 	i := 5
+	text := "Trending posts on the Fediverse:"
 	log.Println("Top 5 words:")
 	for _, word := range list {
 		i--
@@ -136,7 +139,11 @@ func aggregateposts() {
 			break
 		}
 		log.Printf("%s, posted %d times", word.Text, word.Count)
+		text += fmt.Sprintf("\n%s, posted %d times", word.Text, word.Count)
 	}
+	client.PostStatus(context.Background(), &mastodon.Toot{
+		Status: text,
+	})
 	timer.Reset(postInterval)
 }
 
