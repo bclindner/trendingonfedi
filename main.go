@@ -130,7 +130,7 @@ func aggregateposts() {
 	// reset the count now
 	postCount = 0
 	list := sortedList(wordlist)
-	i := 5
+	i := config.WordsToPost
 	text := "Trending posts on the Fediverse:"
 	log.Println("Top 5 words:")
 	for _, word := range list {
@@ -139,7 +139,7 @@ func aggregateposts() {
 			break
 		}
 		log.Printf("%s, posted %d times", word.Text, word.Count)
-		text += fmt.Sprintf("\n%s, posted %d times", word.Text, word.Count)
+		text += fmt.Sprintf("\n- %s, posted %d times", word.Text, word.Count)
 	}
 	client.PostStatus(context.Background(), &mastodon.Toot{
 		Status: text,
