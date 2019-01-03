@@ -43,8 +43,9 @@ const (
 var (
 	// Configuration file.
 	config Config
+	// Mastodon client struct, to control the bot session globally.
 	client *mastodon.Client
-	// Interval in which the aggregation function is run.
+	// Interval in which the aggregation function is run, compiled from the config.
 	postInterval time.Duration
 	// Timer for the aggregation function.
 	timer *time.Timer
@@ -56,6 +57,8 @@ var (
 	postCount int
 	// List of words that the WordList shouldn't ever track.
 	ignoredWords []string
+	// List of users that the WordList shouldn't ever track.
+	blockedUsers []string
 )
 
 // Word is the structure used to represent a word and its occurrences, to sort the WordList.
@@ -81,53 +84,67 @@ func sortedList(list WordList) []Word {
 	return wordSlice
 }
 
+func handleWord(status *mastodon.Status) {
+	// ignore bot posts
+	if status.Account.Bot {
+		return
+	}
+	// ignore blocked users
+	for _, user := range blockedUsers {
+		if user == status.Account.Acct {
+			return
+		}
+	}
+	postCount++
+	ignorecount := 0
+	dupecount := 0
+	var addedWords []string
+	// strip HTML tags
+	stripped := policy.Sanitize(status.Content)
+	// break into words
+	words := strings.Split(stripped, " ")
+	// process and add each word to the wordlist, if it is not a stop word
+WordLoop:
+	for _, word := range words {
+		// unescape HTML entities
+		word = html.UnescapeString(word)
+		// convert it to lowercase
+		word = strings.ToLower(word)
+		// trim the word
+		word = strings.Trim(word, trimchars)
+		// determine if the word is in the ignore list
+		for _, ignoredWord := range ignoredWords {
+			if ignoredWord == word {
+				ignorecount++
+				continue WordLoop
+			}
+		}
+		// ensure the word is unique
+		for _, addedWord := range addedWords {
+			if addedWord == word {
+				dupecount++
+				continue WordLoop
+			}
+		}
+		if len(word) > 0 {
+			wordlist[word]++
+			addedWords = append(addedWords, word)
+		}
+	}
+	if config.LogPosts {
+		log.Printf("Collected %d words (%d ignored, %d duplicate) from post by %s",
+			len(words)-ignorecount-dupecount,
+			ignorecount,
+			dupecount,
+			status.Account.Acct)
+	}
+}
+
 func handleWSEvents(eventstream <-chan mastodon.Event) {
 	for untypedEvent := range eventstream {
 		switch evt := untypedEvent.(type) {
 		case *mastodon.UpdateEvent:
-			// ignore bot posts
-			if evt.Status.Account.Bot {
-				continue
-			}
-			postCount++
-			ignorecount := 0
-			dupecount := 0
-			var addedWords []string
-			// strip HTML tags
-			stripped := policy.Sanitize(evt.Status.Content)
-			// break into words
-			words := strings.Split(stripped, " ")
-			// process and add each word to the wordlist, if it is not a stop word
-		WordLoop:
-			for _, word := range words {
-				// unescape HTML entities
-				word = html.UnescapeString(word)
-				// convert it to lowercase
-				word = strings.ToLower(word)
-				// trim the word
-				word = strings.Trim(word, trimchars)
-				// determine if the word is in the ignore list
-				for _, ignoredWord := range ignoredWords {
-					if ignoredWord == word {
-						ignorecount++
-						continue WordLoop
-					}
-				}
-				// ensure the word is unique
-				for _, addedWord := range addedWords {
-					if addedWord == word {
-						dupecount++
-						continue WordLoop
-					}
-				}
-				if len(word) > 0 {
-					wordlist[word]++
-					addedWords = append(addedWords, word)
-				}
-			}
-			if config.LogPosts {
-				log.Printf("Collected %d words (%d ignored words and %d duplicate words omitted) from post by %s", len(words), ignorecount, dupecount, evt.Status.Account.Acct)
-			}
+			go handleWord(evt.Status)
 		case *mastodon.ErrorEvent:
 			// handle error
 			log.Println("Error in timeline websocket:", evt)
@@ -163,15 +180,25 @@ func aggregateposts() {
 func main() {
 	log.Println("Reading list of ignored words...")
 	// this is inefficient but if that becomes a problem i'll fix it later
-	stopfile, err := os.Open("ignore.txt")
+	ignorefile, err := os.Open("ignore.txt")
 	if err != nil {
 		log.Fatal("Couldn't read ignored words list:", err)
 	}
-	scanner := bufio.NewScanner(stopfile)
+	scanner := bufio.NewScanner(ignorefile)
 	for scanner.Scan() {
 		ignoredWords = append(ignoredWords, scanner.Text())
 	}
 	log.Printf("%d ignored words loaded.\n", len(ignoredWords))
+	blockfile, err := os.Open("block.txt")
+	// only do this if the blockfile was found and there was no problem opening/reading it
+	if err == nil {
+		log.Println("Reading list of blocked users...")
+		scanner := bufio.NewScanner(blockfile)
+		for scanner.Scan() {
+			blockedUsers = append(blockedUsers, scanner.Text())
+		}
+		log.Printf("%d blocked users loaded.\n", len(blockedUsers))
+	}
 	log.Println("Starting the bot...")
 	configfile, err := os.Open("config.json")
 	if err != nil {
