@@ -144,7 +144,7 @@ func aggregateposts() {
 	postCount = 0
 	list := sortedList(wordlist)
 	i := config.WordsToPost
-	text := "Trending posts on the Fediverse:"
+	text := "Trending words on the Fediverse:"
 	log.Println("Top 5 words:")
 	for _, word := range list {
 		i--
