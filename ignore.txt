@@ -629,8 +629,6 @@ members
 men
 merely
 mg
-mh
-microsoft
 might
 mightn't
 mightnt
@@ -1179,9 +1177,6 @@ wasnt
 way
 ways
 we
-web
-webpage
-website
 we'd
 wed
 welcome
@@ -1275,7 +1270,6 @@ x
 y
 ye
 year
-years
 yes
 yet
 you
