@@ -17,14 +17,20 @@ import (
 
 // The Config struct is the format for the configuration file (located at config.json).
 type Config struct {
+	Credentials  Credentials `json:"credentials"`
+	LocalOnly    bool        `json:"localOnly"`
+	LogPosts     bool        `json:"logposts"`
+	PostInterval string      `json:"postInterval"`
+	WordsToPost  int         `json:"wordsToPost"`
+}
+
+// Credentials holds the Mastodon credentials.
+type Credentials struct {
 	Server       string `json:"server"`
 	ClientID     string `json:"clientID"`
 	ClientSecret string `json:"clientSecret"`
 	AccessToken  string `json:"accessToken"`
-	LocalOnly    bool   `json:"localOnly"`
-	LogPosts     bool   `json:"logposts"`
-	PostInterval string `json:"postInterval"`
-	WordsToPost  int    `json:"wordsToPost"`
+	Visibility   string `json:"visibility"`
 }
 
 // WordList is a simple map type that stores each word and its number of occurrences.
@@ -85,6 +91,8 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 			}
 			postCount++
 			ignorecount := 0
+			dupecount := 0
+			var addedWords []string
 			// strip HTML tags
 			stripped := policy.Sanitize(evt.Status.Content)
 			// break into words
@@ -99,21 +107,26 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 				// trim the word
 				word = strings.Trim(word, trimchars)
 				// determine if the word is in the ignore list
-				isIgnoredWord := false
 				for _, ignoredWord := range ignoredWords {
 					if ignoredWord == word {
 						ignorecount++
-						isIgnoredWord = true
 						continue WordLoop
 					}
 				}
-				// don't recognize empty words, either
-				if !isIgnoredWord && len(word) > 0 {
+				// ensure the word is unique
+				for _, addedWord := range addedWords {
+					if addedWord == word {
+						dupecount++
+						continue WordLoop
+					}
+				}
+				if len(word) > 0 {
 					wordlist[word]++
+					addedWords = append(addedWords, word)
 				}
 			}
 			if config.LogPosts {
-				log.Printf("Collected %d words (%d ignored words omitted) from post by %s", len(words), ignorecount, evt.Status.Account.Acct)
+				log.Printf("Collected %d words (%d ignored words and %d duplicate words omitted) from post by %s", len(words), ignorecount, dupecount, evt.Status.Account.Acct)
 			}
 		case *mastodon.ErrorEvent:
 			// handle error
@@ -174,10 +187,10 @@ func main() {
 		log.Fatal("Couldn't parse duration:", err)
 	}
 	client = mastodon.NewClient(&mastodon.Config{
-		Server:       config.Server,
-		ClientID:     config.ClientID,
-		ClientSecret: config.ClientSecret,
-		AccessToken:  config.AccessToken,
+		Server:       config.Credentials.Server,
+		ClientID:     config.Credentials.ClientID,
+		ClientSecret: config.Credentials.ClientSecret,
+		AccessToken:  config.Credentials.AccessToken,
 	})
 	wsclient := client.NewWSClient()
 	eventstream, err := wsclient.StreamingWSPublic(context.Background(), config.LocalOnly)
