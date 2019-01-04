@@ -23,6 +23,7 @@ type Config struct {
 	LogPosts     bool        `json:"logposts"`
 	PostInterval string      `json:"postInterval"`
 	WordsToPost  int         `json:"wordsToPost"`
+	Visibility   string      `json:"visibility"`
 }
 
 // Credentials holds the Mastodon credentials.
@@ -31,7 +32,6 @@ type Credentials struct {
 	ClientID     string `json:"clientID"`
 	ClientSecret string `json:"clientSecret"`
 	AccessToken  string `json:"accessToken"`
-	Visibility   string `json:"visibility"`
 }
 
 // WordList is a simple map type that stores each word and its number of occurrences.
