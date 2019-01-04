@@ -46,8 +46,6 @@ var (
 	config Config
 	// Mastodon client struct, to control the bot session globally.
 	client *mastodon.Client
-	// Interval in which the aggregation function is run, compiled from the config.
-	postInterval time.Duration
 	// Timer for the aggregation function.
 	timer *time.Timer
 	// Bluemonday strip-tags policy, to avoid accidentally logging HTML tags.
@@ -175,7 +173,6 @@ func aggregateposts() {
 	client.PostStatus(context.Background(), &mastodon.Toot{
 		Status: text,
 	})
-	timer.Reset(postInterval)
 }
 
 func main() {
@@ -210,7 +207,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Couldn't parse config file:", err)
 	}
-	postInterval, err = time.ParseDuration(config.PostInterval)
+	postInterval, err := time.ParseDuration(config.PostInterval)
 	if err != nil {
 		log.Fatal("Couldn't parse duration:", err)
 	}
@@ -227,7 +224,15 @@ func main() {
 		log.Fatal("Couldn't open timeline websocket:", err)
 	}
 	log.Printf("Done. Entering event loop.")
-	timer = time.AfterFunc(postInterval, aggregateposts)
+	// set up aggregation ticker
+	ticker := time.NewTicker(postInterval)
+	defer ticker.Stop()
+	go func() {
+		for {
+			<-ticker.C
+			aggregateposts()
+		}
+	}()
 	go handleWSEvents(eventstream)
 	// wait for an interrupt signal
 	sigchan := make(chan os.Signal, 1)
