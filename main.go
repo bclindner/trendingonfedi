@@ -10,6 +10,7 @@ import (
 	"html"
 	"log"
 	"os"
+	"os/signal"
 	"sort"
 	"strings"
 	"time"
@@ -101,15 +102,15 @@ func handleWord(status *mastodon.Status) {
 	var addedWords []string
 	// strip HTML tags
 	stripped := policy.Sanitize(status.Content)
+	// convert it to lowercase
+	lowered := strings.ToLower(stripped)
 	// break into words
-	words := strings.Split(stripped, " ")
+	words := strings.Split(lowered, " ")
 	// process and add each word to the wordlist, if it is not a stop word
 WordLoop:
 	for _, word := range words {
 		// unescape HTML entities
 		word = html.UnescapeString(word)
-		// convert it to lowercase
-		word = strings.ToLower(word)
 		// trim the word
 		word = strings.Trim(word, trimchars)
 		// determine if the word is in the ignore list
@@ -220,11 +221,20 @@ func main() {
 		AccessToken:  config.Credentials.AccessToken,
 	})
 	wsclient := client.NewWSClient()
-	eventstream, err := wsclient.StreamingWSPublic(context.Background(), config.LocalOnly)
+	ctx, cancel := context.WithCancel(context.Background())
+	eventstream, err := wsclient.StreamingWSPublic(ctx, config.LocalOnly)
 	if err != nil {
 		log.Fatal("Couldn't open timeline websocket:", err)
 	}
 	log.Printf("Done. Entering event loop.")
 	timer = time.AfterFunc(postInterval, aggregateposts)
-	handleWSEvents(eventstream)
+	go handleWSEvents(eventstream)
+	// wait for an interrupt signal
+	sigchan := make(chan os.Signal)
+	signal.Notify(sigchan, os.Interrupt, os.Kill)
+	<-sigchan
+	// cleanup
+	log.Printf("Interrupt received, exiting...")
+	cancel()
+	os.Exit(0)
 }
