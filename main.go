@@ -230,7 +230,7 @@ func main() {
 	timer = time.AfterFunc(postInterval, aggregateposts)
 	go handleWSEvents(eventstream)
 	// wait for an interrupt signal
-	sigchan := make(chan os.Signal)
+	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, os.Interrupt, os.Kill)
 	<-sigchan
 	// cleanup
