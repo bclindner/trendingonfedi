@@ -175,29 +175,39 @@ func aggregateposts() {
 	})
 }
 
-func main() {
-	log.Println("Reading list of ignored words...")
-	// this is inefficient but if that becomes a problem i'll fix it later
-	ignorefile, err := os.Open("ignore.txt")
+func readLines(filepath string) (lines []string, err error) {
+	// open file
+	file, err := os.Open(filepath)
 	if err != nil {
-		log.Fatal("Couldn't read ignored words list:", err)
+		return lines, err
 	}
-	scanner := bufio.NewScanner(ignorefile)
+	// scan the file by line
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		ignoredWords = append(ignoredWords, scanner.Text())
+		lines = append(lines, scanner.Text())
+	}
+	return lines, nil
+}
+
+func main() {
+	var err error
+	// read list of ignored words
+	log.Println("Reading list of ignored words...")
+	ignoredWords, err = readLines("ignore.txt")
+	if err != nil {
+		log.Fatal("Couldn't read ignore file:", err)
 	}
 	log.Printf("%d ignored words loaded.\n", len(ignoredWords))
-	blockfile, err := os.Open("block.txt")
-	// only do this if the blockfile was found and there was no problem opening/reading it
-	if err == nil {
-		log.Println("Reading list of blocked users...")
-		scanner := bufio.NewScanner(blockfile)
-		for scanner.Scan() {
-			blockedUsers = append(blockedUsers, scanner.Text())
-		}
+
+	// read list of blocked users, if available
+	blockedUsers, err = readLines("block.txt")
+	if err != nil {
+		log.Println("Blocked users file not found, continuing.")
+	} else {
 		log.Printf("%d blocked users loaded.\n", len(blockedUsers))
 	}
-	log.Println("Starting the bot...")
+
+	// read config file
 	configfile, err := os.Open("config.json")
 	if err != nil {
 		log.Fatal("Couldn't read config file:", err)
@@ -207,10 +217,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Couldn't parse config file:", err)
 	}
-	postInterval, err := time.ParseDuration(config.PostInterval)
-	if err != nil {
-		log.Fatal("Couldn't parse duration:", err)
-	}
+
+	// log in to mastodon & set up websocket
+	log.Println("Starting the bot...")
 	client = mastodon.NewClient(&mastodon.Config{
 		Server:       config.Credentials.Server,
 		ClientID:     config.Credentials.ClientID,
@@ -223,7 +232,12 @@ func main() {
 	if err != nil {
 		log.Fatal("Couldn't open timeline websocket:", err)
 	}
-	log.Printf("Done. Entering event loop.")
+
+	// get post interval
+	postInterval, err := time.ParseDuration(config.PostInterval)
+	if err != nil {
+		log.Fatal("Couldn't parse duration:", err)
+	}
 	// set up aggregation ticker
 	ticker := time.NewTicker(postInterval)
 	defer ticker.Stop()
@@ -233,6 +247,9 @@ func main() {
 			aggregateposts()
 		}
 	}()
+
+	// start event loop
+	log.Printf("Done. Entering event loop.")
 	go handleWSEvents(eventstream)
 	// wait for an interrupt signal
 	sigchan := make(chan os.Signal, 1)
