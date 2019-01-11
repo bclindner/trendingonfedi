@@ -23,7 +23,7 @@ type Config struct {
 	LogPosts     bool        `json:"logposts"`
 	PostInterval string      `json:"postInterval"`
 	WordsToPost  int         `json:"wordsToPost"`
-	EnablePosts bool `json:"enablePosts"`
+	DisablePosts bool `json:"disablePosts"`
 	Visibility   string      `json:"postVisibility"`
 }
 
@@ -171,7 +171,7 @@ func aggregateposts() {
 		log.Printf("%s, posted %d times", word.Text, word.Count)
 		text += fmt.Sprintf("\n- %s, posted %d times", word.Text, word.Count)
 	}
-	if config.EnablePosts {
+	if !config.DisablePosts {
 		client.PostStatus(context.Background(), &mastodon.Toot{
 			Status: text,
 		})
