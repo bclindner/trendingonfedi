@@ -1,4 +1,4 @@
-module mastodon-wordcloud-bot
+module github.com/bclindner/trendingonfedi
 
 require (
 	github.com/gorilla/websocket v1.4.0 // indirect
