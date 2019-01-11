@@ -23,7 +23,8 @@ type Config struct {
 	LogPosts     bool        `json:"logposts"`
 	PostInterval string      `json:"postInterval"`
 	WordsToPost  int         `json:"wordsToPost"`
-	Visibility   string      `json:"visibility"`
+	EnablePosts bool `json:"enablePosts"`
+	Visibility   string      `json:"postVisibility"`
 }
 
 // Credentials holds the Mastodon credentials.
@@ -38,7 +39,7 @@ type Credentials struct {
 type WordList map[string]int
 
 const (
-	trimchars = "!.,;?'`'\""
+	trimchars = "()[]{}!.,;?'`'\""
 )
 
 var (
@@ -143,7 +144,7 @@ func handleWSEvents(eventstream <-chan mastodon.Event) {
 	for untypedEvent := range eventstream {
 		switch evt := untypedEvent.(type) {
 		case *mastodon.UpdateEvent:
-			go handleWord(evt.Status)
+			handleWord(evt.Status)
 		case *mastodon.ErrorEvent:
 			// handle error
 			log.Println("Error in timeline websocket:", evt)
@@ -170,9 +171,11 @@ func aggregateposts() {
 		log.Printf("%s, posted %d times", word.Text, word.Count)
 		text += fmt.Sprintf("\n- %s, posted %d times", word.Text, word.Count)
 	}
-	client.PostStatus(context.Background(), &mastodon.Toot{
-		Status: text,
-	})
+	if config.EnablePosts {
+		client.PostStatus(context.Background(), &mastodon.Toot{
+			Status: text,
+		})
+	}
 }
 
 func readLines(filepath string) (lines []string, err error) {
@@ -232,7 +235,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Couldn't open timeline websocket:", err)
 	}
-
 	// get post interval
 	postInterval, err := time.ParseDuration(config.PostInterval)
 	if err != nil {
